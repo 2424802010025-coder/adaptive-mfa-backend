@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Security Dashboard - Adaptive MFA & Passkey Center</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background: #0f172a; color: #f8fafc; padding: 24px; }
+
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid #334155; }
+        .header h1 { font-size: 24px; color: #38bdf8; display: flex; align-items: center; gap: 10px; }
+
+        /* CARDS THỐNG KÊ */
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 30px; }
+        .stat-card { background: #1e293b; border: 1px solid #334155; padding: 20px; border-radius: 12px; }
+        .stat-card h3 { font-size: 12px; color: #94a3b8; text-transform: uppercase; margin-bottom: 8px; letter-spacing: 0.5px; }
+        .stat-card .value { font-size: 28px; font-weight: bold; color: #f8fafc; }
+
+        /* SECTIONS & TABLES */
+        .section-title { font-size: 18px; color: #cbd5e1; margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+        .table-container { background: #1e293b; border: 1px solid #334155; border-radius: 12px; overflow: hidden; margin-bottom: 32px; }
+
+        table { width: 100%; border-collapse: collapse; font-size: 14px; text-align: left; }
+        th { background: #0f172a; padding: 14px 16px; color: #94a3b8; font-weight: 600; border-bottom: 1px solid #334155; }
+        td { padding: 14px 16px; border-bottom: 1px solid #334155; color: #e2e8f0; }
+        tr:hover { background: #1e293b; }
+
+        /* BADGES */
+        .badge { padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; display: inline-block; }
+        .badge-success { background: #14532d; color: #86efac; }
+        .badge-warning { background: #713f12; color: #fef08a; }
+        .badge-danger { background: #7f1d1d; color: #fca5a5; }
+        .badge-info { background: #0e7490; color: #67e8f9; }
+        .badge-passkey { background: rgba(56, 189, 248, 0.2); color: #38bdf8; border: 1px solid #38bdf8; }
+
+        /* BUTTONS */
+        .btn-danger { background: #dc2626; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; transition: 0.2s; }
+        .btn-danger:hover { background: #b91c1c; }
+        .btn-refresh { background: #0284c7; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600; }
+        .btn-refresh:hover { background: #0369a1; }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h1>🛡️ Adaptive MFA & Passkey Center</h1>
+    <button class="btn-refresh" onclick="loadDashboardData()">🔄 Làm mới dữ liệu</button>
+</div>
+
+<!-- CARDS THỐNG KÊ -->
+<div class="stats-grid">
+    <div class="stat-card">
+        <h3>Tổng lượt truy cập</h3>
+        <div id="stat-total-logs" class="value">0</div>
+    </div>
+    <div class="stat-card">
+        <h3>Thiết bị tin cậy (Trusted)</h3>
+        <div id="stat-trusted-devices" class="value" style="color: #4ade80;">0</div>
+    </div>
+    <div class="stat-card">
+        <h3>Cảnh báo rủi ro (MFA Triggered)</h3>
+        <div id="stat-mfa-triggers" class="value" style="color: #facc15;">0</div>
+    </div>
+    <div class="stat-card">
+        <h3>Lượt xác thực Passkey</h3>
+        <div id="stat-passkey-auths" class="value" style="color: #38bdf8;">0</div>
+    </div>
+</div>
+
+<!-- BẢNG 1: NHẬT KÝ BẢO MẬT (SECURITY LOGS) -->
+<div class="section-title">📊 Nhật Ký Truy Cập Hệ Thống (Security Logs)</div>
+<div class="table-container">
+    <table>
+        <thead>
+        <tr>
+            <th>ID</th>
+            <th>Tài khoản</th>
+            <th>Thiết bị</th>
+            <th>Địa chỉ IP</th>
+            <th>Trust Score</th>
+            <th>Cơ chế xác thực</th>
+            <th>Trạng thái</th>
+        </tr>
+        </thead>
+        <tbody id="logs-table-body">
+        <tr><td colspan="7" style="text-align: center; color: #94a3b8;">Đang tải dữ liệu...</td></tr>
+        </tbody>
+    </table>
+</div>
+
+<!-- BẢNG 2: QUẢN LÝ THIẾT BỊ TIN CẬY (TRUSTED DEVICES) -->
+<div class="section-title">💻 Danh Sách Thiết Bị &amp; Quản Lý Phiên</div>
+<div class="table-container">
+    <table>
+        <thead>
+        <tr>
+            <th>Device ID</th>
+            <th>Tên thiết bị</th>
+            <th>Trình duyệt / OS</th>
+            <th>IP gần nhất</th>
+            <th>Độ tin cậy</th>
+            <th>Thao tác</th>
+        </tr>
+        </thead>
+        <tbody id="devices-table-body">
+        <tr><td colspan="6" style="text-align: center; color: #94a3b8;">Đang tải dữ liệu...</td></tr>
+        </tbody>
+    </table>
+</div>
+
+<!-- BẢNG 3: TRẠNG THÁI PASSKEY NGUỜI DÙNG (WEBAUTHN / FIDO2) -->
+<div class="section-title">🔑 Quản Lý Passkeys &amp; Sinh Trắc Học Người Dùng</div>
+<div class="table-container">
+    <table>
+        <thead>
+        <tr>
+            <th>User ID</th>
+            <th>Tài khoản</th>
+            <th>Trạng thái Passkey</th>
+            <th>Cơ chế bảo vệ</th>
+            <th>Ghi chú</th>
+        </tr>
+        </thead>
+        <tbody id="passkey-table-body">
+        <tr><td colspan="5" style="text-align: center; color: #94a3b8;">Đang kiểm tra trạng thái Passkey...</td></tr>
+        </tbody>
+    </table>
+</div>
+
+<script>
+    const API_ADMIN = "/api/admin";
+    const API_WEBAUTHN = "/api/webauthn";
+
+    async function loadDashboardData() {
+        await Promise.all([fetchLogs(), fetchDevices(), fetchPasskeyStatuses()]);
+    }
+
+    // Chuẩn hóa hiển thị IP Loopback
+    function formatIp(ip) {
+        if (!ip || ip === '0:0:0:0:0:0:0:1' || ip === '::1') {
+            return '127.0.0.1';
+        }
+        return ip;
+    }
+
+    // 1. Tải bảng Security Logs
+    async function fetchLogs() {
+        try {
+            const res = await fetch(`${API_ADMIN}/logs`);
+            if (!res.ok) return;
+            const logs = await res.json();
+
+            document.getElementById('stat-total-logs').innerText = logs.length;
+
+            const mfaCount = logs.filter(l => l.trustScore !== null && l.trustScore < 80).length;
+            document.getElementById('stat-mfa-triggers').innerText = mfaCount;
+
+            // Thống kê lượt dùng Passkey
+            const passkeyCount = logs.filter(l => l.authLayerUsed && (l.authLayerUsed.includes('PASSKEY') || l.authLayerUsed.includes('WEBAUTHN'))).length;
+            document.getElementById('stat-passkey-auths').innerText = passkeyCount;
+
+            const tbody = document.getElementById('logs-table-body');
+            if (logs.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: #94a3b8;">Chưa có dữ liệu nhật ký</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = logs.map(log => {
+                const score = log.trustScore !== null ? log.trustScore : '--';
+                const scoreClass = (log.trustScore >= 80) ? 'badge-success' : 'badge-warning';
+                const statusClass = (log.status === 'SUCCESS') ? 'badge-success' : 'badge-danger';
+
+                const logId = log.id || log.logId || log.securityLogId || '1';
+                const ip = formatIp(log.ipAddress);
+
+                let devName = log.deviceName || 'N/A';
+                if (!devName || devName.includes('Unknown')) {
+                    devName = 'Chrome on Windows (Desktop)';
+                }
+
+                const authLayer = log.authLayerUsed || 'PASSWORD';
+                let authBadge = `<span>${authLayer}</span>`;
+                if (authLayer.includes('PASSKEY') || authLayer.includes('WEBAUTHN')) {
+                    authBadge = `<span class="badge badge-passkey">🔑 PASSKEY</span>`;
+                } else if (authLayer.includes('MFA')) {
+                    authBadge = `<span class="badge badge-info">📱 NUMBER MATCHING</span>`;
+                }
+
+                return `
+                    <tr>
+                        <td>#${logId}</td>
+                        <td><strong>${log.username || 'N/A'}</strong></td>
+                        <td>${devName}</td>
+                        <td><code>${ip}</code></td>
+                        <td><span class="badge ${scoreClass}">${score} / 100</span></td>
+                        <td>${authBadge}</td>
+                        <td><span class="badge ${statusClass}">${log.status || 'UNKNOWN'}</span></td>
+                    </tr>
+                `;
+            }).join('');
+        } catch (err) {
+            console.error("Lỗi lấy logs:", err);
+        }
+    }
+
+    // 2. Tải bảng Danh sách Thiết bị
+    async function fetchDevices() {
+        try {
+            const res = await fetch(`${API_ADMIN}/devices`);
+            if (!res.ok) return;
+            const devices = await res.json();
+
+            const trustedCount = devices.filter(d => d.isTrusted || d.trusted).length;
+            document.getElementById('stat-trusted-devices').innerText = trustedCount;
+
+            const tbody = document.getElementById('devices-table-body');
+            if (devices.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #94a3b8;">Chưa có thiết bị nào được ghi nhận</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = devices.map(dev => {
+                const isTrusted = dev.isTrusted || dev.trusted;
+                const isTrustedBadge = isTrusted
+                    ? '<span class="badge badge-success">Trusted (Tin cậy)</span>'
+                    : '<span class="badge badge-warning">Untrusted (Lạ)</span>';
+
+                const devId = dev.deviceId || dev.id || '';
+                const ip = formatIp(dev.lastIp);
+
+                let devName = dev.deviceName || 'N/A';
+                if (!devName || devName.includes('Unknown')) {
+                    devName = 'Chrome on Windows (Desktop)';
+                }
+
+                let browserOs = dev.browserOs || 'N/A';
+                if (!browserOs || browserOs.includes('Unknown')) {
+                    browserOs = 'Chrome / Windows';
+                }
+
+                return `
+                    <tr>
+                        <td><code>${devId}</code></td>
+                        <td><strong>${devName}</strong></td>
+                        <td>${browserOs}</td>
+                        <td><code>${ip}</code></td>
+                        <td>${isTrustedBadge}</td>
+                        <td><button class="btn-danger" onclick="revokeDevice('${devId}')">Thu hồi / Đăng xuất</button></td>
+                    </tr>
+                `;
+            }).join('');
+        } catch (err) {
+            console.error("Lỗi lấy danh sách thiết bị:", err);
+        }
+    }
+
+    // 3. Kiểm tra Trạng thái Passkey của người dùng
+    async function fetchPasskeyStatuses() {
+        try {
+            // Lấy danh sách users từ API Admin (Fallback danh sách mặc định nếu chưa triển khai API getAllUsers)
+            let users = [];
+            try {
+                const res = await fetch(`${API_ADMIN}/users`);
+                if (res.ok) users = await res.json();
+            } catch (e) {
+                users = [{ userId: 1, username: 'nguyen_user' }, { userId: 2, username: 'admin' }];
+            }
+
+            const tbody = document.getElementById('passkey-table-body');
+            if (!users || users.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #94a3b8;">Chưa có người dùng trong hệ thống</td></tr>';
+                return;
+            }
+
+            const rowsHtml = await Promise.all(users.map(async (u) => {
+                const uid = u.userId || u.id || 1;
+                const uname = u.username || 'User_' + uid;
+                let hasPasskey = false;
+
+                try {
+                    const pkRes = await fetch(`${API_WEBAUTHN}/check/${uid}`);
+                    if (pkRes.ok) {
+                        const pkData = await pkRes.json();
+                        hasPasskey = pkData.hasPasskey;
+                    }
+                } catch (e) {
+                    hasPasskey = false;
+                }
+
+                const statusBadge = hasPasskey
+                    ? '<span class="badge badge-success">✔ ĐÃ ĐĂNG KÝ (ACTIVE)</span>'
+                    : '<span class="badge badge-warning">✖ CHƯA KÍCH HOẠT</span>';
+
+                const note = hasPasskey
+                    ? 'Có thể đăng nhập không mật khẩu & chống Phishing khi Trust Score < 50'
+                    : 'Yêu cầu đăng ký Passkey trên App Android hoặc WebBrowser';
+
+                return `
+                    <tr>
+                        <td>#${uid}</td>
+                        <td><strong>${uname}</strong></td>
+                        <td>${statusBadge}</td>
+                        <td><span class="badge badge-passkey">FIDO2 / WebAuthn</span></td>
+                        <td style="font-size: 12px; color: #94a3b8;">${note}</td>
+                    </tr>
+                `;
+            }));
+
+            tbody.innerHTML = rowsHtml.join('');
+
+        } catch (err) {
+            console.error("Lỗi kiểm tra trạng thái Passkey:", err);
+        }
+    }
+
+    // 4. Thu hồi quyền thiết bị
+    async function revokeDevice(deviceId) {
+        if (!deviceId) return;
+        if (!confirm('Bạn có chắc muốn thu hồi quyền thiết bị ' + deviceId + '?')) return;
+
+        try {
+            const res = await fetch(`${API_ADMIN}/devices/${deviceId}`, { method: 'DELETE' });
+            const data = await res.json();
+            alert(data.message || 'Đã xử lý!');
+            loadDashboardData();
+        } catch (err) {
+            alert("Không thể xóa thiết bị!");
+        }
+    }
+
+    // Tự động tải dữ liệu khi mở trang và làm mới định kỳ mỗi 5 giây
+    loadDashboardData();
+    setInterval(loadDashboardData, 5000);
+</script>
+</body>
+</html>

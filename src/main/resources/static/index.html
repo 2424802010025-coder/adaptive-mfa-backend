@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Xác thực Hệ thống - Adaptive MFA & Passkeys</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color: #f8fafc; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 20px; }
+        .card { background: #1e293b; border: 1px solid #334155; border-radius: 16px; padding: 35px 40px; width: 100%; max-width: 460px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5); text-align: center; }
+
+        .tab-container { display: flex; background: #0f172a; border-radius: 8px; padding: 4px; margin-bottom: 24px; }
+        .tab-btn { flex: 1; padding: 10px; border: none; background: transparent; color: #94a3b8; font-weight: 600; cursor: pointer; border-radius: 6px; transition: 0.2s; }
+        .tab-btn.active { background: #0284c7; color: white; }
+
+        h2 { margin-bottom: 8px; color: #38bdf8; font-size: 22px; }
+        p.subtitle { color: #94a3b8; font-size: 13px; margin-bottom: 20px; }
+
+        .form-group { margin-bottom: 16px; text-align: left; }
+        label { display: block; font-size: 13px; color: #cbd5e1; margin-bottom: 6px; }
+        input[type="text"], input[type="password"], input[type="email"] { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #475569; background: #0f172a; color: #fff; font-size: 14px; outline: none; }
+        input:focus { border-color: #38bdf8; }
+
+        .checkbox-group { display: flex; align-items: center; gap: 8px; margin-top: 10px; margin-bottom: 16px; }
+        .checkbox-group input[type="checkbox"] { width: 16px; height: 16px; accent-color: #0284c7; cursor: pointer; }
+        .checkbox-group label { margin-bottom: 0; font-size: 13px; color: #cbd5e1; cursor: pointer; user-select: none; }
+
+        button.btn-primary { width: 100%; padding: 12px; border-radius: 8px; border: none; background: #0284c7; color: white; font-size: 15px; font-weight: 600; cursor: pointer; transition: 0.2s; margin-top: 10px; }
+        button.btn-primary:hover { background: #0369a1; }
+
+        button.btn-passkey { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #38bdf8; background: rgba(56, 189, 248, 0.1); color: #38bdf8; font-size: 14px; font-weight: 600; cursor: pointer; transition: 0.2s; margin-top: 10px; display: flex; align-items: center; justify-content: center; gap: 8px; }
+        button.btn-passkey:hover { background: rgba(56, 189, 248, 0.25); }
+
+        .divider { display: flex; align-items: center; text-align: center; margin: 18px 0; color: #64748b; font-size: 12px; }
+        .divider::before, .divider::after { content: ''; flex: 1; border-bottom: 1px solid #334155; }
+        .divider:not(:empty)::before { margin-right: .75em; }
+        .divider:not(:empty)::after { margin-left: .75em; }
+
+        .spinner { border: 4px solid rgba(255, 255, 255, 0.1); border-left-color: #38bdf8; border-radius: 50%; width: 36px; height: 36px; animation: spin 1s linear infinite; margin: 15px auto; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        .hidden { display: none; }
+        .badge { background: #0284c7; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; }
+        .alert-error { background: #7f1d1d; color: #fca5a5; padding: 10px; border-radius: 6px; font-size: 13px; margin-bottom: 15px; text-align: left; word-break: break-word; }
+        .alert-success { background: #14532d; color: #86efac; padding: 10px; border-radius: 6px; font-size: 13px; margin-bottom: 15px; text-align: left; }
+        .token-box { background: #0f172a; border: 1px dashed #334155; padding: 10px; border-radius: 6px; font-size: 12px; word-break: break-all; color: #4ade80; margin-top: 10px; text-align: left; max-height: 120px; overflow-y: auto; }
+
+        .number-matching-box { background: #0f172a; border: 2px dashed #0284c7; border-radius: 12px; padding: 16px; margin: 15px 0; }
+        .matching-code { font-size: 42px; font-weight: 800; color: #38bdf8; letter-spacing: 6px; margin-top: 5px; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+
+    <div id="tab-header" class="tab-container">
+        <button id="tab-login-btn" class="tab-btn active" onclick="switchTab('login')">Đăng Nhập</button>
+        <button id="tab-register-btn" class="tab-btn" onclick="switchTab('register')">Đăng Ký</button>
+    </div>
+
+    <!-- 1. MÀN HÌNH ĐĂNG NHẬP -->
+    <div id="step-login">
+        <h2>Đăng Nhập</h2>
+        <p class="subtitle">Hệ thống Đăng nhập Thích ứng (Adaptive MFA)</p>
+
+        <div id="login-error" class="alert-error hidden"></div>
+
+        <div class="form-group">
+            <label>Tên đăng nhập</label>
+            <input type="text" id="login-username" value="nguyen_user">
+        </div>
+        <div class="form-group">
+            <label>Mật khẩu</label>
+            <input type="password" id="login-password" value="Password123!">
+        </div>
+
+        <div class="checkbox-group">
+            <input type="checkbox" id="remember-device">
+            <label for="remember-device">Ghi nhớ thiết bị này (Máy cá nhân)</label>
+        </div>
+
+        <button type="button" class="btn-primary" onclick="handleLogin()">Đăng Nhập Mật Khẩu</button>
+
+        <div class="divider">HOẶC</div>
+
+        <button type="button" class="btn-passkey" onclick="handlePasskeyLogin()">
+            🔑 Đăng nhập nhanh bằng Passkey
+        </button>
+    </div>
+
+    <!-- 2. MÀN HÌNH ĐĂNG KÝ -->
+    <div id="step-register" class="hidden">
+        <h2>Tạo Tài Khoản Mới</h2>
+        <p class="subtitle">Đăng ký tài khoản hệ thống Adaptive MFA</p>
+
+        <div id="register-error" class="alert-error hidden"></div>
+        <div id="register-msg" class="alert-success hidden"></div>
+
+        <div class="form-group">
+            <label>Tên đăng nhập</label>
+            <input type="text" id="reg-username" placeholder="Nhập tên đăng nhập...">
+        </div>
+        <div class="form-group">
+            <label>Email</label>
+            <input type="email" id="reg-email" placeholder="example@domain.com">
+        </div>
+        <div class="form-group">
+            <label>Mật khẩu</label>
+            <input type="password" id="reg-password" placeholder="Tối thiểu 6 ký tự...">
+        </div>
+        <button type="button" class="btn-primary" onclick="handleRegister()">Tiếp Tục Đăng Ký</button>
+    </div>
+
+    <!-- 3. MÀN HÌNH KÍCH HOẠT THIẾT BỊ / PASSKEY -->
+    <div id="step-enroll" class="hidden">
+        <h2>Kích Hoạt Sinh Trắc Học</h2>
+        <p class="subtitle">Liên kết thiết bị di động hoặc Passkey Trình duyệt</p>
+
+        <div id="enroll-error" class="alert-error hidden"></div>
+
+        <div class="spinner"></div>
+
+        <p style="font-size: 13px; color: #e2e8f0; margin-bottom: 12px;">
+            Mở ứng dụng trên điện thoại để <strong>Quét Vân tay / Khuôn mặt</strong>.
+        </p>
+
+        <div class="divider">HOẶC</div>
+
+        <button type="button" class="btn-passkey" onclick="handlePasskeyRegister()">
+            🛡️ Đăng ký Passkey cho Trình duyệt này
+        </button>
+    </div>
+
+    <!-- 4. MÀN HÌNH CHỜ MFA & KHỚP SỐ (NUMBER MATCHING & PASSKEY) -->
+    <div id="step-mfa" class="hidden">
+        <h2>Xác Thực Thích Ứng (MFA)</h2>
+        <p class="subtitle">Cơ chế Khớp Số An Toàn (Number Matching)</p>
+
+        <div id="mfa-error" class="alert-error hidden"></div>
+
+        <div class="number-matching-box">
+            <p style="font-size: 13px; color: #cbd5e1;">Nhập mã số này trên App di động của bạn:</p>
+            <div id="mfa-code-display" class="matching-code">--</div>
+        </div>
+
+        <div class="spinner"></div>
+
+        <p style="font-size: 13px; color: #94a3b8; margin-top: 10px;">
+            Trust Score: <span id="trust-score-badge" class="badge">--</span>
+        </p>
+
+        <div class="divider">XÁC THỰC THAY THẾ</div>
+
+        <button type="button" class="btn-passkey" onclick="handlePasskeyMfaVerify()">
+            🔑 Xác thực bằng Passkey (Windows Hello / TouchID)
+        </button>
+    </div>
+
+    <!-- 5. MÀN HÌNH ĐĂNG NHẬP THÀNH CÔNG -->
+    <div id="step-success" class="hidden">
+        <h2 style="color: #4ade80;">🎉 Đăng Nhập Thành Công!</h2>
+        <p class="subtitle">Chào mừng bạn đã truy cập vào hệ thống an toàn.</p>
+
+        <div style="text-align: left; font-size: 14px; margin-bottom: 6px;">
+            <strong>JWT Access Token:</strong>
+        </div>
+        <div id="token-display" class="token-box"></div>
+
+        <button class="btn-primary" onclick="location.reload()" style="margin-top: 20px; background: #334155;">Đăng Xuất</button>
+    </div>
+
+</div>
+
+<script>
+    const API_AUTH = "http://localhost:8080/api/auth";
+    const API_WEBAUTHN = "http://localhost:8080/api/webauthn";
+    let pollingInterval = null;
+    let currentActiveUsername = "";
+
+    // ==================== HÀM BỔ TRỢ CHUYỂN ĐỔI BASE64URL ====================
+    function bufferToBase64Url(buffer) {
+        const bytes = new Uint8Array(buffer);
+        let string = '';
+        for (let i = 0; i < bytes.byteLength; i++) {
+            string += String.fromCharCode(bytes[i]);
+        }
+        return btoa(string).replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
+    }
+
+    function base64UrlToBuffer(base64url) {
+        let padding = '='.repeat((4 - base64url.length % 4) % 4);
+        let base64 = (base64url + padding).replace(/-/g, '+').replace(/_/g, '/');
+        let rawData = window.atob(base64);
+        let outputArray = new Uint8Array(rawData.length);
+        for (let i = 0; i < rawData.length; ++i) {
+            outputArray[i] = rawData.charCodeAt(i);
+        }
+        return outputArray.buffer;
+    }
+
+    function switchTab(tab) {
+        document.getElementById('login-error').classList.add('hidden');
+        document.getElementById('register-error').classList.add('hidden');
+        document.getElementById('register-msg').classList.add('hidden');
+
+        if (tab === 'login') {
+            document.getElementById('tab-login-btn').classList.add('active');
+            document.getElementById('tab-register-btn').classList.remove('active');
+            document.getElementById('step-login').classList.remove('hidden');
+            document.getElementById('step-register').classList.add('hidden');
+        } else {
+            document.getElementById('tab-register-btn').classList.add('active');
+            document.getElementById('tab-login-btn').classList.remove('active');
+            document.getElementById('step-register').classList.remove('hidden');
+            document.getElementById('step-login').classList.add('hidden');
+        }
+    }
+
+    // ==================== LUỒNG ĐĂNG KÝ ====================
+    async function handleRegister() {
+        const username = document.getElementById('reg-username').value.trim();
+        const email = document.getElementById('reg-email').value.trim();
+        const password = document.getElementById('reg-password').value;
+        const errorDiv = document.getElementById('register-error');
+
+        errorDiv.classList.add('hidden');
+
+        if (!username || !password) {
+            errorDiv.innerText = "Vui lòng nhập đầy đủ tên đăng nhập và mật khẩu!";
+            errorDiv.classList.remove('hidden');
+            return;
+        }
+
+        currentActiveUsername = username;
+
+        try {
+            const response = await fetch(`${API_AUTH}/register`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, email, password })
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.message || 'Đăng ký thất bại!');
+            }
+
+            document.getElementById('tab-header').classList.add('hidden');
+            document.getElementById('step-register').classList.add('hidden');
+            document.getElementById('step-enroll').classList.remove('hidden');
+
+            startPollingEnrollment(data.enrollmentId || username);
+
+        } catch (err) {
+            errorDiv.innerText = err.message;
+            errorDiv.classList.remove('hidden');
+        }
+    }
+
+    function startPollingEnrollment(enrollmentId) {
+        if (pollingInterval) clearInterval(pollingInterval);
+        pollingInterval = setInterval(async () => {
+            try {
+                const res = await fetch(`${API_AUTH}/enroll-status/${enrollmentId}`);
+                const data = await res.json();
+
+                if (data.status === 'COMPLETED' || data.status === 'SUCCESS') {
+                    clearInterval(pollingInterval);
+                    alert("🎉 Liên kết sinh trắc học di động thành công! Bạn có thể đăng nhập ngay.");
+                    location.reload();
+                }
+            } catch (err) {
+                console.error("Lỗi Polling Enroll:", err);
+            }
+        }, 2000);
+    }
+
+    // ==================== ĐĂNG KÝ PASSKEY TRÊN TRÌNH DUYỆT ====================
+    async function handlePasskeyRegister() {
+        const errorDiv = document.getElementById('enroll-error');
+        errorDiv.classList.add('hidden');
+
+        if (!window.PublicKeyCredential) {
+            errorDiv.innerText = "Trình duyệt của bạn không hỗ trợ WebAuthn / Passkeys!";
+            errorDiv.classList.remove('hidden');
+            return;
+        }
+
+        try {
+            // 1. Lấy Options từ Backend
+            const resOptions = await fetch(`${API_WEBAUTHN}/register/options?username=${encodeURIComponent(currentActiveUsername)}`);
+            if (!resOptions.ok) throw new Error("Không thể khởi tạo thông số Passkey từ server!");
+            const optionsData = await resOptions.json();
+
+            // 2. Gọi WebAuthn API của Trình duyệt
+            const credential = await navigator.credentials.create({
+                publicKey: {
+                    rp: { name: "Adaptive MFA System", id: optionsData.rpId || window.location.hostname },
+                    user: {
+                        id: new TextEncoder().encode(optionsData.userId),
+                        name: optionsData.username,
+                        displayName: optionsData.username
+                    },
+                    challenge: base64UrlToBuffer(optionsData.challenge),
+                    pubKeyCredParams: [{ type: "public-key", alg: -7 }, { type: "public-key", alg: -257 }],
+                    timeout: 60000,
+                    authenticatorSelection: { userVerification: "preferred" }
+                }
+            });
+
+            // 3. Gửi thông tin Credential lên Server
+            const credentialId = bufferToBase64Url(credential.rawId);
+            const attestationObject = bufferToBase64Url(credential.response.attestationObject);
+
+            const resVerify = await fetch(`${API_WEBAUTHN}/register/verify?username=${encodeURIComponent(currentActiveUsername)}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    credentialId: credentialId,
+                    attestationObject: attestationObject,
+                    deviceName: navigator.userAgentData ? navigator.userAgentData.platform : "Web Browser Passkey"
+                })
+            });
+
+            if (!resVerify.ok) throw new Error("Đăng ký Passkey với Server thất bại!");
+
+            if (pollingInterval) clearInterval(pollingInterval);
+            alert("🎉 Đăng ký Passkey cho Trình duyệt này thành công! Bạn có thể sử dụng Passkey để đăng nhập.");
+            location.reload();
+
+        } catch (err) {
+            errorDiv.innerText = "Lỗi Passkey: " + err.message;
+            errorDiv.classList.remove('hidden');
+        }
+    }
+
+    // ==================== LUỒNG ĐĂNG NHẬP MẬT KHẨU ====================
+    async function handleLogin() {
+        const username = document.getElementById('login-username').value.trim();
+        const password = document.getElementById('login-password').value;
+        const rememberDevice = document.getElementById('remember-device').checked;
+        const errorDiv = document.getElementById('login-error');
+
+        errorDiv.classList.add('hidden');
+        currentActiveUsername = username;
+
+        try {
+            const response = await fetch(`${API_AUTH}/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    username: username,
+                    password: password,
+                    rememberDevice: rememberDevice
+                })
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.message || 'Đăng nhập thất bại');
+            }
+
+            document.getElementById('tab-header').classList.add('hidden');
+
+            if (data.trustScore >= 80) {
+                showDashboard(data.token);
+            } else {
+                document.getElementById('step-login').classList.add('hidden');
+                document.getElementById('step-mfa').classList.remove('hidden');
+                document.getElementById('trust-score-badge').innerText = data.trustScore;
+                document.getElementById('mfa-code-display').innerText = data.mfaCode || '--';
+
+                startPollingMfaStatus(data.requestId);
+            }
+
+        } catch (err) {
+            errorDiv.innerText = err.message;
+            errorDiv.classList.remove('hidden');
+        }
+    }
+
+    // ==================== ĐĂNG NHẬP BẰNG PASSKEY (PASSWORDLESS) ====================
+    async function handlePasskeyLogin() {
+        const username = document.getElementById('login-username').value.trim();
+        const errorDiv = document.getElementById('login-error');
+        errorDiv.classList.add('hidden');
+
+        if (!username) {
+            errorDiv.innerText = "Vui lòng nhập tên đăng nhập trước khi quét Passkey!";
+            errorDiv.classList.remove('hidden');
+            return;
+        }
+
+        currentActiveUsername = username;
+
+        try {
+            // 1. Lấy Challenge từ Server
+            const resOptions = await fetch(`${API_WEBAUTHN}/authenticate/options?username=${encodeURIComponent(username)}`);
+            if (!resOptions.ok) throw new Error("Không thể lấy Challenge Passkey!");
+            const optionsData = await resOptions.json();
+
+            // 2. Kích hoạt xác thực sinh trắc học trên Trình duyệt
+            const assertion = await navigator.credentials.get({
+                publicKey: {
+                    challenge: base64UrlToBuffer(optionsData.challenge),
+                    rpId: optionsData.rpId || window.location.hostname,
+                    userVerification: "preferred"
+                }
+            });
+
+            // 3. Gửi chữ ký số lên Server để kiểm tra
+            const credentialId = bufferToBase64Url(assertion.rawId);
+            const resVerify = await fetch(`${API_WEBAUTHN}/authenticate/verify?username=${encodeURIComponent(username)}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ credentialId: credentialId })
+            });
+
+            const verifyData = await resVerify.json();
+            if (!resVerify.ok || verifyData.status !== "SUCCESS") {
+                throw new Error(verifyData.message || "Xác thực Passkey thất bại!");
+            }
+
+            showDashboard(verifyData.accessToken || "MOCK_JWT_PASSKEY_SUCCESS_TOKEN");
+
+        } catch (err) {
+            errorDiv.innerText = "Lỗi Passkey: " + err.message;
+            errorDiv.classList.remove('hidden');
+        }
+    }
+
+    // ==================== XÁC THỰC PASSKEY TRONG BƯỚC MFA ====================
+    async function handlePasskeyMfaVerify() {
+        const errorDiv = document.getElementById('mfa-error');
+        errorDiv.classList.add('hidden');
+
+        try {
+            const resOptions = await fetch(`${API_WEBAUTHN}/authenticate/options?username=${encodeURIComponent(currentActiveUsername)}`);
+            if (!resOptions.ok) throw new Error("Không thể tạo yêu cầu Passkey MFA!");
+            const optionsData = await resOptions.json();
+
+            const assertion = await navigator.credentials.get({
+                publicKey: {
+                    challenge: base64UrlToBuffer(optionsData.challenge),
+                    rpId: optionsData.rpId || window.location.hostname,
+                    userVerification: "preferred"
+                }
+            });
+
+            const credentialId = bufferToBase64Url(assertion.rawId);
+            const resVerify = await fetch(`${API_WEBAUTHN}/authenticate/verify?username=${encodeURIComponent(currentActiveUsername)}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ credentialId: credentialId })
+            });
+
+            const verifyData = await resVerify.json();
+            if (!resVerify.ok || verifyData.status !== "SUCCESS") {
+                throw new Error("Xác thực chữ ký Passkey thất bại!");
+            }
+
+            if (pollingInterval) clearInterval(pollingInterval);
+            showDashboard(verifyData.accessToken || "MOCK_JWT_ADAPTIVE_PASSKEY_TOKEN");
+
+        } catch (err) {
+            errorDiv.innerText = "Lỗi xác thực Passkey: " + err.message;
+            errorDiv.classList.remove('hidden');
+        }
+    }
+
+    function startPollingMfaStatus(requestId) {
+        if (pollingInterval) clearInterval(pollingInterval);
+        pollingInterval = setInterval(async () => {
+            try {
+                const res = await fetch(`${API_AUTH}/mfa-status/${requestId}`);
+                const data = await res.json();
+
+                if (data.status === 'APPROVED') {
+                    clearInterval(pollingInterval);
+                    showDashboard(data.accessToken);
+                } else if (data.status === 'REJECTED') {
+                    clearInterval(pollingInterval);
+                    alert("Yêu cầu xác thực bị TỪ CHỐI hoặc Nhập sai mã khớp số!");
+                    location.reload();
+                }
+            } catch (err) {
+                console.error("Lỗi Polling MFA:", err);
+            }
+        }, 2000);
+    }
+
+    function showDashboard(token) {
+        document.getElementById('tab-header').classList.add('hidden');
+        document.getElementById('step-login').classList.add('hidden');
+        document.getElementById('step-enroll').classList.add('hidden');
+        document.getElementById('step-mfa').classList.add('hidden');
+        document.getElementById('step-success').classList.remove('hidden');
+        document.getElementById('token-display').innerText = token;
+    }
+</script>
+</body>
+</html>

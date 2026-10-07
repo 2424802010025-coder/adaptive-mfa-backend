@@ -30,27 +30,25 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
 
-                // Cấu hình Stateless Session (Không tạo JSESSIONID Cookie trên Server)
+                // Cấu hình Stateless Session
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
                 .authorizeHttpRequests(auth -> auth
-                        // Cho phép tài nguyên tĩnh, Auth APIs, WebAuthn/Passkey APIs và Endpoint WebSocket
+                        // BỔ SUNG: Cho phép toàn bộ tài nguyên tĩnh, API Auth, WebAuthn và ADMIN công khai (phục vụ Demo)
                         .requestMatchers(
                                 "/",
                                 "/index.html",
                                 "/admin.html",
-                                "/api/auth/**",      // API đăng nhập, gửi OTP, xác minh MFA
-                                "/api/webauthn/**",  // BỔ SUNG: Cho phép gọi các API Passkey/WebAuthn
+                                "/api/auth/**",
+                                "/api/webauthn/**",
+                                "/api/admin/**",     // ĐÃ THÊM: Mở quyền cho admin.html xem logs & devices
                                 "/ws-native",
                                 "/ws-native/**",
                                 "/ws-mfa",
                                 "/ws-mfa/**"
                         ).permitAll()
 
-                        // Các Endpoint Admin bắt buộc phải có quyền ADMIN
-                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
-
-                        // Mọi API còn lại đều yêu cầu xác thực
+                        // Mọi API còn lại yêu cầu xác thực
                         .anyRequest().authenticated()
                 );
 

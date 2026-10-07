@@ -129,8 +129,8 @@
 </div>
 
 <script>
-    const API_ADMIN = "/api/admin";
-    const API_WEBAUTHN = "/api/webauthn";
+    const API_ADMIN = "https://adaptive-mfa-backend.onrender.com/api/admin";
+    const API_WEBAUTHN = "https://adaptive-mfa-backend.onrender.com/api/webauthn";
 
     async function loadDashboardData() {
         await Promise.all([fetchLogs(), fetchDevices(), fetchPasskeyStatuses()]);

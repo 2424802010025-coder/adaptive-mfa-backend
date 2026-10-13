@@ -11,6 +11,8 @@
         .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid #334155; }
         .header h1 { font-size: 24px; color: #38bdf8; display: flex; align-items: center; gap: 10px; }
 
+        .header-actions { display: flex; gap: 10px; align-items: center; }
+
         /* CARDS THỐNG KÊ */
         .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 30px; }
         .stat-card { background: #1e293b; border: 1px solid #334155; padding: 20px; border-radius: 12px; }
@@ -37,15 +39,22 @@
         /* BUTTONS */
         .btn-danger { background: #dc2626; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; transition: 0.2s; }
         .btn-danger:hover { background: #b91c1c; }
-        .btn-refresh { background: #0284c7; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600; }
+
+        .btn-refresh { background: #0284c7; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600; transition: 0.2s; }
         .btn-refresh:hover { background: #0369a1; }
+
+        .btn-logout { background: #334155; color: #f8fafc; border: 1px solid #475569; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600; transition: 0.2s; }
+        .btn-logout:hover { background: #475569; }
     </style>
 </head>
 <body>
 
 <div class="header">
-    <h1>🛡️ Adaptive MFA & Passkey Center</h1>
-    <button class="btn-refresh" onclick="loadDashboardData()">🔄 Làm mới dữ liệu</button>
+    <h1>🛡️ Adaptive MFA & Passkey Admin Center</h1>
+    <div class="header-actions">
+        <button class="btn-refresh" onclick="loadDashboardData()">🔄 Làm mới</button>
+        <button class="btn-logout" onclick="handleLogout()">🚪 Đăng Xuất</button>
+    </div>
 </div>
 
 <!-- CARDS THỐNG KÊ -->
@@ -109,7 +118,7 @@
     </table>
 </div>
 
-<!-- BẢNG 3: TRẠNG THÁI PASSKEY NGUỜI DÙNG (WEBAUTHN / FIDO2) -->
+<!-- BẢNG 3: TRẠNG THÁI PASSKEY NGƯỜI DÙNG (WEBAUTHN / FIDO2) -->
 <div class="section-title">🔑 Quản Lý Passkeys &amp; Sinh Trắc Học Người Dùng</div>
 <div class="table-container">
     <table>
@@ -131,6 +140,18 @@
 <script>
     const API_ADMIN = "https://adaptive-mfa-backend.onrender.com/api/admin";
     const API_WEBAUTHN = "https://adaptive-mfa-backend.onrender.com/api/webauthn";
+
+    // Kiểm tra bảo mật phiên đăng nhập Quản trị viên
+    window.addEventListener('DOMContentLoaded', () => {
+        const token = localStorage.getItem("jwt_token");
+        const username = localStorage.getItem("current_username");
+
+        if (!token) {
+            alert("Vui lòng đăng nhập quyền quản trị trước!");
+            window.location.href = 'dangnhap.html';
+            return;
+        }
+    });
 
     async function loadDashboardData() {
         await Promise.all([fetchLogs(), fetchDevices(), fetchPasskeyStatuses()]);
@@ -156,7 +177,6 @@
             const mfaCount = logs.filter(l => l.trustScore !== null && l.trustScore < 80).length;
             document.getElementById('stat-mfa-triggers').innerText = mfaCount;
 
-            // Thống kê lượt dùng Passkey
             const passkeyCount = logs.filter(l => l.authLayerUsed && (l.authLayerUsed.includes('PASSKEY') || l.authLayerUsed.includes('WEBAUTHN'))).length;
             document.getElementById('stat-passkey-auths').innerText = passkeyCount;
 
@@ -174,10 +194,7 @@
                 const logId = log.id || log.logId || log.securityLogId || '1';
                 const ip = formatIp(log.ipAddress);
 
-                let devName = log.deviceName || 'N/A';
-                if (!devName || devName.includes('Unknown')) {
-                    devName = 'Chrome on Windows (Desktop)';
-                }
+                let devName = log.deviceName || 'Chrome on Windows (Desktop)';
 
                 const authLayer = log.authLayerUsed || 'PASSWORD';
                 let authBadge = `<span>${authLayer}</span>`;
@@ -228,16 +245,8 @@
 
                 const devId = dev.deviceId || dev.id || '';
                 const ip = formatIp(dev.lastIp);
-
-                let devName = dev.deviceName || 'N/A';
-                if (!devName || devName.includes('Unknown')) {
-                    devName = 'Chrome on Windows (Desktop)';
-                }
-
-                let browserOs = dev.browserOs || 'N/A';
-                if (!browserOs || browserOs.includes('Unknown')) {
-                    browserOs = 'Chrome / Windows';
-                }
+                let devName = dev.deviceName || 'Chrome on Windows (Desktop)';
+                let browserOs = dev.browserOs || 'Chrome / Windows';
 
                 return `
                     <tr>
@@ -246,7 +255,7 @@
                         <td>${browserOs}</td>
                         <td><code>${ip}</code></td>
                         <td>${isTrustedBadge}</td>
-                        <td><button class="btn-danger" onclick="revokeDevice('${devId}')">Thu hồi / Đăng xuất</button></td>
+                        <td><button class="btn-danger" onclick="revokeDevice('${devId}')">Thu hồi</button></td>
                     </tr>
                 `;
             }).join('');
@@ -258,7 +267,6 @@
     // 3. Kiểm tra Trạng thái Passkey của người dùng
     async function fetchPasskeyStatuses() {
         try {
-            // Lấy danh sách users từ API Admin (Fallback danh sách mặc định nếu chưa triển khai API getAllUsers)
             let users = [];
             try {
                 const res = await fetch(`${API_ADMIN}/users`);
@@ -293,8 +301,8 @@
                     : '<span class="badge badge-warning">✖ CHƯA KÍCH HOẠT</span>';
 
                 const note = hasPasskey
-                    ? 'Có thể đăng nhập không mật khẩu & chống Phishing khi Trust Score < 50'
-                    : 'Yêu cầu đăng ký Passkey trên App Android hoặc WebBrowser';
+                    ? 'Sẵn sàng đăng nhập không mật khẩu & chống Phishing'
+                    : 'Chưa liên kết sinh trắc học Passkey';
 
                 return `
                     <tr>
@@ -317,7 +325,7 @@
     // 4. Thu hồi quyền thiết bị
     async function revokeDevice(deviceId) {
         if (!deviceId) return;
-        if (!confirm('Bạn có chắc muốn thu hồi quyền thiết bị ' + deviceId + '?')) return;
+        if (!confirm('Bạn có chắc muốn thu hồi quyền thiết bị này?')) return;
 
         try {
             const res = await fetch(`${API_ADMIN}/devices/${deviceId}`, { method: 'DELETE' });
@@ -327,6 +335,13 @@
         } catch (err) {
             alert("Không thể xóa thiết bị!");
         }
+    }
+
+    // 5. Đăng xuất hệ thống Admin
+    function handleLogout() {
+        localStorage.removeItem("jwt_token");
+        localStorage.removeItem("current_username");
+        window.location.href = 'dangnhap.html';
     }
 
     // Tự động tải dữ liệu khi mở trang và làm mới định kỳ mỗi 5 giây

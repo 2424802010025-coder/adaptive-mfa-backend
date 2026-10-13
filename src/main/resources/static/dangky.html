@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Đăng Ký Tài Khoản - Adaptive MFA & Passkeys</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+    body { background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color: #f8fafc; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 20px; }
+    .card { background: #1e293b; border: 1px solid #334155; border-radius: 16px; padding: 35px 40px; width: 100%; max-width: 480px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5); text-align: center; }
+
+    h2 { margin-bottom: 8px; color: #38bdf8; font-size: 24px; }
+    p.subtitle { color: #94a3b8; font-size: 13px; margin-bottom: 24px; }
+
+    .form-group { margin-bottom: 16px; text-align: left; }
+    label { display: block; font-size: 13px; color: #cbd5e1; margin-bottom: 6px; }
+
+    .input-password-wrapper { position: relative; }
+    input[type="text"], input[type="password"], input[type="email"] { width: 100%; padding: 12px 40px 12px 12px; border-radius: 8px; border: 1px solid #475569; background: #0f172a; color: #fff; font-size: 14px; outline: none; }
+    input:focus { border-color: #38bdf8; }
+
+    .toggle-password { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); background: transparent; border: none; cursor: pointer; font-size: 16px; color: #94a3b8; }
+    .toggle-password:hover { color: #38bdf8; }
+
+    /* BẢNG KIỂM TRA ĐỘ PHỨC TẠP MẬT KHẨU */
+    .password-requirements { background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 12px; margin-top: 8px; text-align: left; font-size: 12px; }
+    .req-item { color: #94a3b8; margin-bottom: 4px; display: flex; align-items: center; gap: 6px; }
+    .req-item.valid { color: #4ade80; }
+
+    button.btn-primary { width: 100%; padding: 12px; border-radius: 8px; border: none; background: #0284c7; color: white; font-size: 15px; font-weight: 600; cursor: pointer; transition: 0.2s; margin-top: 15px; }
+    button.btn-primary:hover { background: #0369a1; }
+
+    button.btn-passkey { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #38bdf8; background: rgba(56, 189, 248, 0.1); color: #38bdf8; font-size: 14px; font-weight: 600; cursor: pointer; transition: 0.2s; margin-top: 10px; display: flex; align-items: center; justify-content: center; gap: 8px; }
+    button.btn-passkey:hover { background: rgba(56, 189, 248, 0.25); }
+
+    .divider { display: flex; align-items: center; text-align: center; margin: 18px 0; color: #64748b; font-size: 12px; }
+    .divider::before, .divider::after { content: ''; flex: 1; border-bottom: 1px solid #334155; }
+    .divider:not(:empty)::before { margin-right: .75em; }
+    .divider:not(:empty)::after { margin-left: .75em; }
+
+    .spinner { border: 4px solid rgba(255, 255, 255, 0.1); border-left-color: #38bdf8; border-radius: 50%; width: 36px; height: 36px; animation: spin 1s linear infinite; margin: 15px auto; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+    .hidden { display: none; }
+    .alert-error { background: #7f1d1d; color: #fca5a5; padding: 10px; border-radius: 6px; font-size: 13px; margin-bottom: 15px; text-align: left; word-break: break-word; }
+    .alert-success { background: #14532d; color: #86efac; padding: 10px; border-radius: 6px; font-size: 13px; margin-bottom: 15px; text-align: left; }
+
+    .link-text { margin-top: 18px; font-size: 13px; color: #94a3b8; }
+    .link-text a { color: #38bdf8; text-decoration: none; font-weight: 600; }
+    .link-text a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+
+<div class="card">
+
+  <!-- 1. MÀN HÌNH ĐĂNG KÝ -->
+  <div id="step-register-form">
+    <h2>Tạo Tài Khoản Mới</h2>
+    <p class="subtitle">Đăng ký hệ thống bảo mật Adaptive MFA</p>
+
+    <div id="register-error" class="alert-error hidden"></div>
+
+    <div class="form-group">
+      <label>Tên đăng nhập</label>
+      <input type="text" id="reg-username" placeholder="Nhập tên đăng nhập (không khoảng trắng)...">
+    </div>
+
+    <div class="form-group">
+      <label>Địa chỉ Email</label>
+      <input type="email" id="reg-email" placeholder="example@domain.com">
+    </div>
+
+    <div class="form-group">
+      <label>Mật khẩu</label>
+      <div class="input-password-wrapper">
+        <input type="password" id="reg-password" placeholder="Nhập mật khẩu..." oninput="validatePasswordInput()">
+        <button type="button" class="toggle-password" onclick="togglePassword('reg-password')">👁️</button>
+      </div>
+
+      <!-- Bảng kiểm tra tiêu chí mật khẩu trực quan -->
+      <div class="password-requirements">
+        <div id="req-length" class="req-item">❌ Tối thiểu 8 ký tự</div>
+        <div id="req-upper" class="req-item">❌ Ít nhất 1 chữ cái viết hoa (A-Z)</div>
+        <div id="req-lower" class="req-item">❌ Ít nhất 1 chữ cái viết thường (a-z)</div>
+        <div id="req-number" class="req-item">❌ Ít nhất 1 chữ số (0-9)</div>
+        <div id="req-special" class="req-item">❌ Ít nhất 1 ký tự đặc biệt (@$!%*?&)</div>
+      </div>
+    </div>
+
+    <button type="button" class="btn-primary" onclick="handleRegister()">Đăng Ký &amp; Tiếp Tục</button>
+
+    <div class="link-text">
+      Đã có tài khoản? <a href="dangnhap.html">Đăng nhập ngay</a>
+    </div>
+  </div>
+
+  <!-- 2. MÀN HÌNH KÍCH HOẠT PASSKEY / SINH TRẮC HỌC SAU KHI ĐĂNG KÝ -->
+  <div id="step-enroll" class="hidden">
+    <h2>Kích Hoạt Bảo Mật</h2>
+    <p class="subtitle">Liên kết thiết bị hoặc đăng ký Passkey cho trình duyệt</p>
+
+    <div id="enroll-error" class="alert-error hidden"></div>
+    <div class="alert-success">🎉 Tài khoản đã được tạo thành công! Hãy đăng ký Passkey để tăng cường bảo mật.</div>
+
+    <div class="spinner"></div>
+
+    <p style="font-size: 13px; color: #e2e8f0; margin-bottom: 12px;">
+      Đang chờ liên kết thiết bị hoặc bạn có thể đăng ký trực tiếp Passkey bên dưới:
+    </p>
+
+    <button type="button" class="btn-passkey" onclick="handlePasskeyRegister()">
+      🛡️ Đăng ký Passkey (Windows Hello / TouchID)
+    </button>
+
+    <div class="link-text" style="margin-top: 20px;">
+      <a href="dangnhap.html">Bỏ qua và chuyển đến trang Đăng nhập</a>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  const API_AUTH = "https://adaptive-mfa-backend.onrender.com/api/auth";
+  const API_WEBAUTHN = "https://adaptive-mfa-backend.onrender.com/api/webauthn";
+  let currentActiveUsername = "";
+  let pollingInterval = null;
+
+  // Hàm ẩn/hiện mật khẩu
+  function togglePassword(fieldId) {
+    const input = document.getElementById(fieldId);
+    input.type = input.type === 'password' ? 'text' : 'password';
+  }
+
+  // Kiểm tra thời gian thực các tiêu chí mật khẩu
+  function validatePasswordInput() {
+    const pwd = document.getElementById('reg-password').value;
+
+    const hasLength = pwd.length >= 8;
+    const hasUpper = /[A-Z]/.test(pwd);
+    const hasLower = /[a-z]/.test(pwd);
+    const hasNumber = /\d/.test(pwd);
+    const hasSpecial = /[@$!%*?&]/.test(pwd);
+
+    updateReqStatus('req-length', hasLength, 'Tối thiểu 8 ký tự');
+    updateReqStatus('req-upper', hasUpper, 'Ít nhất 1 chữ cái viết hoa (A-Z)');
+    updateReqStatus('req-lower', hasLower, 'Ít nhất 1 chữ cái viết thường (a-z)');
+    updateReqStatus('req-number', hasNumber, 'Ít nhất 1 chữ số (0-9)');
+    updateReqStatus('req-special', hasSpecial, 'Ít nhất 1 ký tự đặc biệt (@$!%*?&)');
+
+    return hasLength && hasUpper && hasLower && hasNumber && hasSpecial;
+  }
+
+  function updateReqStatus(elementId, isValid, text) {
+    const el = document.getElementById(elementId);
+    if (isValid) {
+      el.className = "req-item valid";
+      el.innerText = "✔ " + text;
+    } else {
+      el.className = "req-item";
+      el.innerText = "❌ " + text;
+    }
+  }
+
+  // Chuyển đổi Base64URL cho WebAuthn
+  function bufferToBase64Url(buffer) {
+    const bytes = new Uint8Array(buffer);
+    let string = '';
+    for (let i = 0; i < bytes.byteLength; i++) {
+      string += String.fromCharCode(bytes[i]);
+    }
+    return btoa(string).replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
+  }
+
+  function base64UrlToBuffer(base64url) {
+    let padding = '='.repeat((4 - (base64url.length % 4)) % 4);
+    let base64 = (base64url + padding).replace(/-/g, '+').replace(/_/g, '/');
+    let rawData = window.atob(base64);
+    let outputArray = new Uint8Array(rawData.length);
+    for (let i = 0; i < rawData.length; ++i) {
+      outputArray[i] = rawData.charCodeAt(i);
+    }
+    return outputArray.buffer;
+  }
+
+  // Xử lý Gửi thông tin Đăng ký lên Backend
+  async function handleRegister() {
+    const username = document.getElementById('reg-username').value.trim();
+    const email = document.getElementById('reg-email').value.trim();
+    const password = document.getElementById('reg-password').value;
+    const errorDiv = document.getElementById('register-error');
+
+    errorDiv.classList.add('hidden');
+
+    if (!username || !email || !password) {
+      errorDiv.innerText = "Vui lòng điền đầy đủ thông tin vào các trường!";
+      errorDiv.classList.remove('hidden');
+      return;
+    }
+
+    if (!validatePasswordInput()) {
+      errorDiv.innerText = "Mật khẩu chưa đáp ứng đủ các tiêu chuẩn bảo mật bên dưới!";
+      errorDiv.classList.remove('hidden');
+      return;
+    }
+
+    currentActiveUsername = username;
+
+    try {
+      const response = await fetch(`${API_AUTH}/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, email, password })
+      });
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || 'Đăng ký thất bại!');
+
+      // Chuyển sang màn hình kích hoạt / đăng ký Passkey
+      document.getElementById('step-register-form').classList.add('hidden');
+      document.getElementById('step-enroll').classList.remove('hidden');
+
+      if (data.enrollmentId) {
+        startPollingEnrollment(data.enrollmentId);
+      }
+    } catch (err) {
+      errorDiv.innerText = err.message;
+      errorDiv.classList.remove('hidden');
+    }
+  }
+
+  // Đăng ký Passkey cho trình duyệt sau khi đăng ký tài khoản
+  async function handlePasskeyRegister() {
+    const errorDiv = document.getElementById('enroll-error');
+    errorDiv.classList.add('hidden');
+
+    if (!window.PublicKeyCredential) {
+      errorDiv.innerText = "Trình duyệt của bạn không hỗ trợ WebAuthn / Passkeys!";
+      errorDiv.classList.remove('hidden');
+      return;
+    }
+
+    try {
+      const resOptions = await fetch(`${API_WEBAUTHN}/register/options?username=${encodeURIComponent(currentActiveUsername)}`);
+      if (!resOptions.ok) throw new Error("Không thể khởi tạo thông số Passkey từ server!");
+      const optionsData = await resOptions.json();
+
+      const credential = await navigator.credentials.create({
+        publicKey: {
+          rp: { name: "Adaptive MFA System", id: optionsData.rpId || window.location.hostname },
+          user: {
+            id: new TextEncoder().encode(optionsData.userId),
+            name: optionsData.username,
+            displayName: optionsData.username
+          },
+          challenge: base64UrlToBuffer(optionsData.challenge),
+          pubKeyCredParams: [{ type: "public-key", alg: -7 }, { type: "public-key", alg: -257 }],
+          timeout: 60000,
+          authenticatorSelection: { userVerification: "preferred" }
+        }
+      });
+
+      const credentialId = bufferToBase64Url(credential.rawId);
+      const attestationObject = bufferToBase64Url(credential.response.attestationObject);
+
+      const resVerify = await fetch(`${API_WEBAUTHN}/register/verify?username=${encodeURIComponent(currentActiveUsername)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          credentialId: credentialId,
+          attestationObject: attestationObject,
+          deviceName: navigator.userAgentData ? navigator.userAgentData.platform : "Web Browser Passkey"
+        })
+      });
+
+      if (!resVerify.ok) throw new Error("Đăng ký Passkey với Server thất bại!");
+
+      if (pollingInterval) clearInterval(pollingInterval);
+      alert("🎉 Đăng ký Passkey thành công! Đang chuyển hướng về trang đăng nhập.");
+      window.location.href = 'dangnhap.html';
+
+    } catch (err) {
+      errorDiv.innerText = "Lỗi Passkey: " + err.message;
+      errorDiv.classList.remove('hidden');
+    }
+  }
+
+  function startPollingEnrollment(enrollmentId) {
+    if (pollingInterval) clearInterval(pollingInterval);
+    pollingInterval = setInterval(async () => {
+      try {
+        const res = await fetch(`${API_AUTH}/enroll-status/${enrollmentId}`);
+        const data = await res.json();
+
+        if (data.status === 'COMPLETED' || data.status === 'SUCCESS') {
+          clearInterval(pollingInterval);
+          alert("🎉 Liên kết thiết bị thành công! Chuyển sang đăng nhập.");
+          window.location.href = 'dangnhap.html';
+        }
+      } catch (err) {
+        console.error("Lỗi Polling Enroll:", err);
+      }
+    }, 2000);
+  }
+</script>
+</body>
+</html>

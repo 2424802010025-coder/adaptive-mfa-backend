@@ -34,21 +34,27 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
                 .authorizeHttpRequests(auth -> auth
-                        // BỔ SUNG: Cho phép toàn bộ tài nguyên tĩnh, API Auth, WebAuthn và ADMIN công khai (phục vụ Demo)
+                        // Cho phép toàn bộ trang công khai và tài nguyên tĩnh
                         .requestMatchers(
                                 "/",
                                 "/index.html",
+                                "/trangchu.html",    // <--- Thêm trang chủ
+                                "/dangky.html",      // <--- Thêm trang đăng ký
+                                "/dangnhap.html",    // <--- Trang đăng nhập
                                 "/admin.html",
+                                "/css/**",           // Thư mục CSS
+                                "/js/**",            // Thư mục JS
+                                "/images/**",        // Thư mục ảnh
                                 "/api/auth/**",
                                 "/api/webauthn/**",
-                                "/api/admin/**",     // ĐÃ THÊM: Mở quyền cho admin.html xem logs & devices
+                                "/api/admin/**",
                                 "/ws-native",
                                 "/ws-native/**",
                                 "/ws-mfa",
                                 "/ws-mfa/**"
                         ).permitAll()
 
-                        // Mọi API còn lại yêu cầu xác thực
+                        // Mọi request còn lại yêu cầu xác thực
                         .anyRequest().authenticated()
                 );
 

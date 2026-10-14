@@ -173,7 +173,7 @@
   }
 
   function base64UrlToBuffer(base64url) {
-    let padding = '='.repeat((4 - (base64url.length % 4)) % 4);
+    let padding = '='.repeat((4 * (base64url.length % 4)) % 4); // <--- Đã thêm dấu * vào đây
     let base64 = (base64url + padding).replace(/-/g, '+').replace(/_/g, '/');
     let rawData = window.atob(base64);
     let outputArray = new Uint8Array(rawData.length);
@@ -262,6 +262,7 @@
 
       const credentialId = bufferToBase64Url(credential.rawId);
       const attestationObject = bufferToBase64Url(credential.response.attestationObject);
+      const clientDataJSON = bufferToBase64Url(credential.response.clientDataJSON); // <--- Lấy thêm clientDataJSON
 
       const resVerify = await fetch(`${API_WEBAUTHN}/register/verify?username=${encodeURIComponent(currentActiveUsername)}`, {
         method: 'POST',
@@ -269,6 +270,7 @@
         body: JSON.stringify({
           credentialId: credentialId,
           attestationObject: attestationObject,
+          clientDataJSON: clientDataJSON, // <--- Truyền lên backend cho khớp DTO
           deviceName: navigator.userAgentData ? navigator.userAgentData.platform : "Web Browser Passkey"
         })
       });

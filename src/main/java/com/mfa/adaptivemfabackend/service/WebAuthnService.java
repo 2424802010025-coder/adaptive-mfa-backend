@@ -2,9 +2,9 @@ package com.mfa.adaptivemfabackend.service;
 
 import com.mfa.adaptivemfabackend.dto.PasskeyOptionsResponse;
 import com.mfa.adaptivemfabackend.dto.PasskeyVerifyRequest;
+import com.mfa.adaptivemfabackend.entity.PasskeyCredential;
 import com.mfa.adaptivemfabackend.entity.User;
-import com.mfa.adaptivemfabackend.entity.UserPasskey;
-import com.mfa.adaptivemfabackend.repository.UserPasskeyRepository;
+import com.mfa.adaptivemfabackend.repository.PasskeyCredentialRepository;
 import com.mfa.adaptivemfabackend.repository.UserRepository;
 import com.webauthn4j.WebAuthnManager;
 import com.webauthn4j.data.client.Origin;
@@ -25,12 +25,11 @@ import java.util.concurrent.ConcurrentHashMap;
 public class WebAuthnService {
 
     @Autowired
-    private UserPasskeyRepository userPasskeyRepository;
+    private PasskeyCredentialRepository passkeyCredentialRepository;
 
     @Autowired
     private UserRepository userRepository;
 
-    // Bộ nhớ tạm trong RAM lưu trữ Challenge chống Replay Attack
     private final Map<String, Challenge> challengeStore = new ConcurrentHashMap<>();
 
     @Value("${webauthn.relying-party.id:localhost}")
@@ -40,8 +39,6 @@ public class WebAuthnService {
     private String originUrl;
 
     private final WebAuthnManager webAuthnManager = WebAuthnManager.createNonStrictWebAuthnManager();
-
-    // ==================== QUẢN LÝ CHALLENGE & WEBAUTHN CORE ====================
 
     public String generateAndSaveChallenge(String sessionKey) {
         Challenge challenge = new DefaultChallenge();
@@ -62,11 +59,6 @@ public class WebAuthnService {
         return new ServerProperty(origin, rpId, challenge, null);
     }
 
-    // ==================== LUỒNG ĐĂNG KÝ PASSKEY ====================
-
-    /**
-     * Tạo Registration Options trả về cho Frontend / Android App
-     */
     public PasskeyOptionsResponse generateRegistrationOptions(String username) {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng: " + username));
@@ -84,9 +76,6 @@ public class WebAuthnService {
                 .build();
     }
 
-    /**
-     * Lưu thông tin Passkey đăng ký từ ứng dụng vào DB
-     */
     public void registerPasskey(String username, PasskeyVerifyRequest request) {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng: " + username));
@@ -96,24 +85,18 @@ public class WebAuthnService {
             throw new RuntimeException("Challenge đã hết hạn hoặc không tồn tại!");
         }
 
-        UserPasskey passkey = new UserPasskey();
-        passkey.setUser(user);
-        passkey.setCredentialId(request.getCredentialId());
-        passkey.setPublicKey(request.getAttestationObject() != null ? request.getAttestationObject() : "MOCK_PUBLIC_KEY");
-        passkey.setSignCount(0);
-        passkey.setDeviceName(request.getDeviceName() != null ? request.getDeviceName() : "Android Device");
-        passkey.setCreatedAt(LocalDateTime.now());
-        passkey.setLastUsedAt(LocalDateTime.now());
+        PasskeyCredential passkey = PasskeyCredential.builder()
+                .credentialId(request.getCredentialId())
+                .user(user)
+                .publicKey(request.getAttestationObject() != null ? request.getAttestationObject() : "MOCK_PUBLIC_KEY")
+                .signCount(0)
+                .createdAt(LocalDateTime.now())
+                .build();
 
-        userPasskeyRepository.save(passkey);
+        passkeyCredentialRepository.save(passkey);
         challengeStore.remove(username);
     }
 
-    // ==================== LUỒNG XÁC THỰC PASSKEY (ADAPTIVE MFA) ====================
-
-    /**
-     * Tạo Assertion Options cho quá trình đăng nhập/xác thực khi Trust Score < 50
-     */
     public PasskeyOptionsResponse generateAssertionOptions(String username) {
         Challenge challenge = new DefaultChallenge();
         challengeStore.put(username, challenge);
@@ -127,37 +110,26 @@ public class WebAuthnService {
                 .build();
     }
 
-    /**
-     * Kiểm tra chữ ký Passkey từ thiết bị gửi lên
-     */
     public boolean verifyPasskey(String username, PasskeyVerifyRequest request) {
         Challenge challenge = challengeStore.get(username);
         if (challenge == null) {
             throw new RuntimeException("Challenge đã hết hạn hoặc không tồn tại!");
         }
 
-        Optional<UserPasskey> passkeyOpt = userPasskeyRepository.findByCredentialId(request.getCredentialId());
+        Optional<PasskeyCredential> passkeyOpt = passkeyCredentialRepository.findById(request.getCredentialId());
         if (passkeyOpt.isEmpty()) {
             return false;
         }
 
-        UserPasskey passkey = passkeyOpt.get();
-
-        // Cập nhật lượt ký và thời gian truy cập
+        PasskeyCredential passkey = passkeyOpt.get();
         passkey.setSignCount(passkey.getSignCount() + 1);
-        passkey.setLastUsedAt(LocalDateTime.now());
-        userPasskeyRepository.save(passkey);
+        passkeyCredentialRepository.save(passkey);
 
         challengeStore.remove(username);
         return true;
     }
 
-    // ==================== HÀM KIỂM TRA TRẠNG THÁI ====================
-
-    /**
-     * Kiểm tra xem user đã từng đăng ký Passkey nào chưa (dùng Integer userId theo đúng Entity)
-     */
     public boolean userHasPasskey(Integer userId) {
-        return userPasskeyRepository.existsByUserUserId(userId);
+        return !passkeyCredentialRepository.findByUser_UserId(userId).isEmpty();
     }
 }

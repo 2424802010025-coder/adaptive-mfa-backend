@@ -51,7 +51,8 @@ public class SecurityConfig {
                                 "/ws-native",
                                 "/ws-native/**",
                                 "/ws-mfa",
-                                "/ws-mfa/**"
+                                "/ws-mfa/**",
+                                "/favicon.ico"
                         ).permitAll()
 
                         // Mọi request còn lại yêu cầu xác thực

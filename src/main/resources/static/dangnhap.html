@@ -146,9 +146,8 @@
         }
         return btoa(string).replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
     }
-
     function base64UrlToBuffer(base64url) {
-        let padding = '='.repeat((4 - (base64url.length % 4)) % 4);
+        let padding = '='.repeat((4 * (base64url.length % 4)) % 4); // <--- Đã thêm dấu * vào đây
         let base64 = (base64url + padding).replace(/-/g, '+').replace(/_/g, '/');
         let rawData = window.atob(base64);
         let outputArray = new Uint8Array(rawData.length);
@@ -157,7 +156,6 @@
         }
         return outputArray.buffer;
     }
-
     // Luồng Đăng nhập Mật khẩu
     async function handleLogin() {
         const username = document.getElementById('login-username').value.trim();
